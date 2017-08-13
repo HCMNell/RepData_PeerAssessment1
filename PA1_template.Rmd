@@ -1,25 +1,124 @@
 ---
-title: "Reproducible Research: Peer Assessment 1"
-output: 
-  html_document:
-    keep_md: true
+title: "Activiy Step Analysis"
+author: "H Nell"
+date: "13 August 2017"
+output: html_document
 ---
+### The purpose of these analyses is to evaluate activity measured by the number of steps taken per day over 5-minute intervals
+###One analysis will evaluate if there are differences in the activity between week days and weekends
 
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
 
-## Loading and preprocessing the data
+## Draw a histogram of the total number of steps per day
+```{r setwde, echo=FALSE}
+setwd("C:/MyDocuments/Coursera/Data Science/Course 5 Reproducible Research/Week 2/Assign")
 
+fulldata <- read.csv("activity.csv")
 
+#Ignore all the NA values
 
-## What is mean total number of steps taken per day?
+nona <- na.omit(fulldata) 
+nona$date <- factor(nona$date)
 
+#Calculate the total number of steps per day
+totsteps <- tapply(nona$steps,nona$date,sum,na.rm=TRUE)
+totsteps <- data.frame(date=names(totsteps),steps=totsteps)
+#Draw a histogram of the total number of steps per day
+plot(totsteps$date,totsteps$steps, main="Total Steps Per Day", type="h",xlab="Date",ylab="Steps")
 
+#Calculate the mean number of steps taken per day
+stepsmean <- format(mean(totsteps$steps,na.rm=TRUE),digits=9)
+#Calculate the median number of steps taken per day
+stepsmedian <- format(median(totsteps$steps,na.rm=TRUE),digits=9)
+```
 
-## What is the average daily activity pattern?
+## Mean and Median
+The mean is `r stepsmean`, and the median is `r stepsmedian`.
 
+## Steps per Interval
+```{r interval_mean, echo=FALSE, results="hide"}
+#Calculate the mean steps per interval
+avgsteps <- tapply(nona$steps,nona$interval,mean,na.rm=TRUE)
+avgsteps <- data.frame(intervals=names(avgsteps),values=avgsteps)
+avgsteps$intervals <- strptime(avgsteps$intervals,"%H%M")
 
+#Draw the average steps per interval on a time series plot
+plot(avgsteps$intervals,avgsteps$values, main="Average Steps Per Interval", type="l",xlab="Interval",ylab="Steps")
 
-## Imputing missing values
+#Determine which interval contains the highest number of steps
+moststeps <- row.names(avgsteps)[which(avgsteps$values==max(avgsteps$values))]
+```
 
+The most number of step occurs in interval `r moststeps`
 
+## NA Values
+```{r navals, echo=FALSE, results="hide"}
+#Calculate the total number of missing values in the original data
+numna <- nrow(fulldata[fulldata$steps=="NA",])
+```
 
-## Are there differences in activity patterns between weekdays and weekends?
+There are `r numna` rows with NA values
+
+```{r replacena, echo=TRUE, results="hide"}
+#Replace NA values with the average of the interval
+for (i in 1:(nrow(fulldata))) {
+    if (is.na(fulldata$steps[i])) 
+    {
+        fulldata$steps[i] <- avgsteps$values[match(fulldata$interval[i], avgsteps$interval)]
+        ##print(paste(i,fillna$steps[i],sep=" "))
+    }
+}
+```
+```{r calcsteps, echo=FALSE, results="hide"}
+#Calculate the total number of steps per day
+totsteps2 <- tapply(fulldata$steps,fulldata$date,sum,na.rm=TRUE)
+totsteps2 <- data.frame(date=names(totsteps2),steps=totsteps2)
+
+#Draw a histogram of the total number of steps per day
+plot(totsteps2$date,totsteps2$steps, main="Total Steps Per Day NA`s replaced", type="h",xlab="Interval",ylab="Steps")
+
+#Calculate the mean number of steps taken per day
+stepsmean2 <- format(mean(totsteps2$steps,na.rm=TRUE),digits=9)
+#Calculate the median number of steps taken per day
+stepsmedian2 <- format(median(totsteps2$steps,na.rm=TRUE),digits=9)
+```
+
+## Mean and Median (NA values removed)
+With no NA values, the mean is `r stepsmean2`, and the median is `r stepsmedian2`.
+
+Both the mean and median have increased when the NA values were replaced by the average per interval
+
+## Weekday vs Weekend Analysis
+```{r week, echo=FALSE, results="hide"}
+#Create a new factor variable to indicate if the date is a WEEKDAY or WEEKEND
+for (i in 1:(nrow(fulldata))) {
+if (weekdays(as.Date(fulldata$date[i],abbreviate=FALSE)) == 'Saturday' | weekdays(as.Date(fulldata$date[i],abbreviate=FALSE)) == 'Sunday') 
+{
+fulldata$week[i] <- 'WEEKEND'
+#print(paste(i,fulldata$week[i],sep=" "))
+}
+else 
+{
+fulldata$week[i] <- 'WEEKDAY'
+}
+}
+
+#Split the dataset into 2 seperate datasets to plot WEEKDAY and WEEKEND on seperate plots
+weekdata <- subset(fulldata,fulldata$week == "WEEKDAY")
+weekenddata <- subset(fulldata,fulldata$week == "WEEKEND")
+
+totweekdata <- tapply(weekdata$steps,weekdata$interval,sum,na.rm=TRUE)
+totweekdata <- data.frame(interval=names(totweekdata),steps=totweekdata)
+
+totweekenddata <- tapply(weekenddata$steps,weekenddata$interval,sum,na.rm=TRUE)
+totweekenddata <- data.frame(interval=names(totweekenddata),steps=totweekenddata)
+
+#Calculate the y-axis range
+rng <- range(totweekdata$steps,totweekenddata$steps)
+
+par(mfrow=c(2,1), mar=c(4,4,2,1)) # set to disply plot in 2 rows with 1 colmn and adjust margins
+plot(totweekdata$interval, totweekdata$steps,type="l", main="Weekdays", ylim=rng,xlab="Interval",ylab="Steps")
+plot(totweekenddata$interval, totweekenddata$steps,type="l", main="Weekends", ylim=rng,xlab="Interval",ylab="Steps")
+```
